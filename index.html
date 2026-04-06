@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ColorPalette - 配色方案生成器</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,'Segoe UI',sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh;}
+.app{max-width:900px;margin:0 auto;padding:20px;}
+.header{text-align:center;margin-bottom:20px;}
+.header h1{font-size:1.5em;} .header h1 span{color:#ec4899;}
+.controls{display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;}
+.btn{padding:12px 24px;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:500;transition:all 0.2s;}
+.btn-primary{background:#ec4899;color:#fff;}
+.btn-secondary{background:#1e293b;color:#e2e8f0;border:1px solid #334155;}
+.palettes{display:flex;flex-direction:column;gap:20px;}
+.palette{background:#1e293b;border-radius:12px;overflow:hidden;}
+.palette-header{padding:12px 16px;background:#0f172a;display:flex;align-items:center;justify-content:space-between;}
+.palette-name{font-size:14px;font-weight:600;}
+.palette-colors{display:flex;}
+.palette-color{flex:1;height:80px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:10px;font-size:12px;font-family:'Courier New',monospace;cursor:pointer;transition:transform 0.2s;}
+.palette-color:hover{transform:scaleY(1.1);}
+.export-area{background:#1e293b;border-radius:12px;padding:20px;margin-top:20px;}
+.export-area h3{font-size:14px;margin-bottom:12px;color:#94a3b8;}
+.export-code{background:#0f172a;border-radius:8px;padding:12px;font-family:'Courier New',monospace;font-size:12px;overflow-x:auto;}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header"><h1>Color<span>Palette</span></h1></div>
+  
+  <div class="controls">
+    <button class="btn btn-primary" onclick="generate()">🎲 随机生成</button>
+    <button class="btn btn-secondary" onclick="generateType('warm')">暖色系</button>
+    <button class="btn btn-secondary" onclick="generateType('cool')">冷色系</button>
+    <button class="btn btn-secondary" onclick="generateType('pastel')">柔和色</button>
+    <button class="btn btn-secondary" onclick="generateType('neon')">霓虹色</button>
+    <button class="btn btn-secondary" onclick="generateType('earth')">大地色</button>
+  </div>
+  
+  <div class="palettes" id="palettes"></div>
+  
+  <div class="export-area">
+    <h3>CSS 变量</h3>
+    <div class="export-code" id="export-code"></div>
+  </div>
+</div>
+
+<script>
+let palettes = [];
+
+const types = {
+  warm: { hue: [0, 60], sat: [70, 100], light: [45, 65] },
+  cool: { hue: [180, 270], sat: [60, 90], light: [40, 60] },
+  pastel: { hue: [0, 360], sat: [30, 60], light: [70, 90] },
+  neon: { hue: [0, 360], sat: [90, 100], light: [50, 60] },
+  earth: { hue: [20, 50], sat: [30, 60], light: [30, 50] }
+};
+
+function rand(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function hslToHex(h, s, l) {
+  s /= 100; l /= 100;
+  const a = s * Math.min(l, 1 - l);
+  const f = n => {
+    const k = (n + h / 30) % 12;
+    const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+    return Math.round(255 * color).toString(16).padStart(2, '0');
+  };
+  return `#${f(0)}${f(8)}${f(4)}`;
+}
+
+function generatePalette(type) {
+  const t = types[type] || { hue: [0, 360], sat: [50, 100], light: [40, 60] };
+  const colors = [];
+  for (let i = 0; i < 5; i++) {
+    const h = rand(t.hue[0], t.hue[1]);
+    const s = rand(t.sat[0], t.sat[1]);
+    const l = rand(t.light[0], t.light[1]);
+    colors.push(hslToHex(h, s, l));
+  }
+  return colors;
+}
+
+function generate() {
+  palettes = [];
+  const names = ['主色调', '辅助色', '强调色'];
+  for (let i = 0; i < 3; i++) {
+    palettes.push({
+      name: names[i],
+      colors: generatePalette('default')
+    });
+  }
+  render();
+}
+
+function generateType(type) {
+  palettes = [{
+    name: type === 'warm' ? '暖色系' : type === 'cool' ? '冷色系' : type === 'pastel' ? '柔和色' : type === 'neon' ? '霓虹色' : '大地色',
+    colors: generatePalette(type)
+  }];
+  render();
+}
+
+function render() {
+  document.getElementById('palettes').innerHTML = palettes.map(p => `
+    <div class="palette">
+      <div class="palette-header">
+        <span class="palette-name">${p.name}</span>
+      </div>
+      <div class="palette-colors">
+        ${p.colors.map(c => `
+          <div class="palette-color" style="background:${c};color:${parseInt(c.slice(1), 16) > 0xffffff / 2 ? '#000' : '#fff'}" onclick="copyColor('${c}')">
+            ${c}
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
+  
+  const allColors = palettes.flatMap(p => p.colors);
+  document.getElementById('export-code').textContent = `:root {\n${allColors.map((c, i) => `  --color-${i + 1}: ${c};`).join('\n')}\n}`;
+}
+
+function copyColor(color) {
+  navigator.clipboard.writeText(color);
+}
+
+generate();
+</script>
+</body>
+</html>
